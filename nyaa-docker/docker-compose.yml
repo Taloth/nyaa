@@ -1,0 +1,61 @@
+version: '2'
+
+services:
+  backend:
+    build: .
+    links:
+      - db:db
+      - elastic:elastic
+    ports:
+      - 5500:5500
+    volumes:
+      - ../nyaa:/app/nyaa
+    #entrypoint: ["python", "/app/db_create.py"]
+    #entrypoint: ["/bin/bash", "/app/create_es.sh"]
+    #entrypoint: ["autopep8", "/app/nyaa/", "--recursive", "--in-place", "--pep8-passes", "2000", "--max-line-length", "100", "--verbose"]
+
+  db:
+    image: mariadb:10.0
+    volumes_from:
+      - db-data
+    environment:
+      MYSQL_DATABASE: nyaav2
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test123
+      MYSQL_ROOT_PASSWORD: test123
+
+  # Single node cluster, but image supports multi-master and separate data nodes
+  elastic:
+    build: elasticsearch
+    volumes_from:
+      - elastic-data
+    environment:    
+      CLUSTER: nyaav2
+      NODE_NAME: nyaav2.m1
+      TYPE: MASTER_DATA
+      MIN_MASTERS: 1
+
+  # Separate data containers, so we can freely update the other containers.
+  db-data:
+    image: busybox
+    entrypoint: /bin/true
+    network_mode: none
+    restart: 'no'
+    volumes:
+      - /var/lib/mysql
+
+  elastic-data:
+    image: busybox
+    entrypoint: /bin/true
+    network_mode: none
+    restart: 'no'
+    volumes:
+      - /usr/share/elasticsearch/data
+
+  # Kibana instance to be able to look into elastic more easily
+  kibana:
+    image: kibana:5.0
+    ports:
+      - 5502:5601
+    links:
+      - elastic:elasticsearch
